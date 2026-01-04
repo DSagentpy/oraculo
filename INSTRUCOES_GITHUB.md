@@ -40,3 +40,5 @@ Após o push, você pode verificar se tudo funcionou acessando:
 
 **Nota:** Os arquivos `teste.py` e `opcao.py` foram ignorados conforme solicitado e não serão enviados ao GitHub.
 
+
+
