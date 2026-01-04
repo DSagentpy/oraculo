@@ -1,126 +1,12 @@
 import streamlit as st
-import tempfile
 
-from langchain_openai import ChatOpenAI
-from langchain_groq import ChatGroq
-
-from loaders import (
-    carregar_site,
-    carregar_youtube,
-    carregar_pdf,
-    carregar_csv,
-    carregar_txt
-)
-
-from vectorstore import criar_vectorstore
+from config import TIPOS_ARQUIVOS, MODELOS
+from rag import inicializar_oraculo, stream_resposta
+from session import remover_sessao
 
 
-# =============================
-# CONFIGURAÇÕES
-# =============================
-
-TIPOS_ARQUIVOS = ["Site", "Youtube", "PDF", "Csv", "Txt"]
-
-MODELOS = {
-    "OpenAI": {
-        "chat": ChatOpenAI,
-        "modelos": ["gpt-4o-mini", "gpt-4o"]
-    },
-    "Groq": {
-        "chat": ChatGroq,
-        "modelos": [
-            "llama-3.1-70b-versatile",
-            "mixtral-8x7b-32768"
-        ]
-    }
-}
-
-
-# =============================
-# FUNÇÕES AUXILIARES
-# =============================
-
-def carregar_arquivo(tipo, arquivo):
-    if tipo == "Site":
-        return carregar_site(arquivo)
-
-    if tipo == "Youtube":
-        return carregar_youtube(arquivo)
-
-    with tempfile.NamedTemporaryFile(delete=False) as temp:
-        temp.write(arquivo.read())
-        path = temp.name
-
-    if tipo == "PDF":
-        return carregar_pdf(path)
-
-    if tipo == "Csv":
-        return carregar_csv(path)
-
-    if tipo == "Txt":
-        return carregar_txt(path)
-
-
-def inicializar_oraculo(provedor, modelo, api_key, tipo, arquivo):
-    documento = carregar_arquivo(tipo, arquivo)
-
-    vectordb = criar_vectorstore(documento, api_key)
-    retriever = vectordb.as_retriever(search_kwargs={"k": 8})
-
-    llm = MODELOS[provedor]["chat"](
-        model=modelo,
-        api_key=api_key,
-        streaming=True
-    )
-
-    st.session_state.oraculo = {
-        "retriever": retriever,
-        "llm": llm
-    }
-
-    st.session_state.history = []
-    st.success("✅ Oráculo inicializado com memória vetorial e streaming!")
-
-
-def stream_resposta(oraculo, pergunta):
-    retriever = oraculo["retriever"]
-    llm = oraculo["llm"]
-
-    docs = retriever.invoke(pergunta)
-
-    contexto = "\n\n".join([doc.page_content for doc in docs])
-
-    prompt = f"""
-Você é um assistente chamado Oráculo.
-Use SOMENTE as informações abaixo para responder.
-Se não souber, diga que não encontrou no material.
-
-###
-{contexto}
-###
-
-Pergunta: {pergunta}
-"""
-
-    for chunk in llm.stream(prompt):
-        yield chunk.content
-
-
-# =============================
-# INTERFACE
-# =============================
-
-st.set_page_config(
-    page_title="Oráculo RAG",
-    layout="wide"
-)
-
-st.title("🔮 Oráculo com Memória Vetorial (ChromaDB)")
-
-
-# =============================
-# SIDEBAR
-# =============================
+st.set_page_config(page_title="Oráculo RAG", layout="wide")
+st.title("🔮 Oráculo com Memória Vetorial")
 
 with st.sidebar:
     st.header("⚙️ Configurações")
@@ -130,12 +16,9 @@ with st.sidebar:
     if tipo in ["Site", "Youtube"]:
         arquivo = st.text_input("URL")
     else:
-        arquivo = st.file_uploader(
-            "Upload de arquivo",
-            type=tipo.lower()
-        )
+        arquivo = st.file_uploader("Upload", type=tipo.lower())
 
-    provedor = st.selectbox("Provedor do modelo", MODELOS.keys())
+    provedor = st.selectbox("Provedor", MODELOS.keys())
     modelo = st.selectbox("Modelo", MODELOS[provedor]["modelos"])
     api_key = st.text_input("API Key", type="password")
 
@@ -143,26 +26,27 @@ with st.sidebar:
         if not arquivo or not api_key:
             st.error("Preencha todos os campos.")
         else:
-            inicializar_oraculo(
-                provedor,
-                modelo,
-                api_key,
-                tipo,
-                arquivo
-            )
+            inicializar_oraculo(provedor, modelo, api_key, tipo, arquivo)
+            st.success("Oráculo inicializado!")
 
-    if st.button("🧹 Limpar Memória"):
+    if st.button("🧹 Limpar Histórico"):
         st.session_state.history = []
-        st.success("Memória limpa!")
 
+    if st.button("🗑️ Remover Sessão"):
+        remover_sessao()
+        st.success("Sessão removida!")
 
-# =============================
-# CHAT
-# =============================
 
 if "oraculo" not in st.session_state:
     st.info("Inicialize o Oráculo no menu lateral.")
 else:
+    for h in st.session_state.history:
+        with st.chat_message("user"):
+            st.markdown(h["pergunta"])
+
+        with st.chat_message("assistant"):
+            st.markdown(h["resposta"])
+
     pergunta = st.chat_input("Pergunte ao Oráculo")
 
     if pergunta:
@@ -177,6 +61,7 @@ else:
                 )
             )
 
-        st.session_state.history.append(
-            {"pergunta": pergunta, "resposta": resposta}
-        )
+        st.session_state.history.append({
+            "pergunta": pergunta,
+            "resposta": resposta
+        })

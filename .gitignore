@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+chromadb/
 
 # Arquivos específicos do projeto
 teste.py
@@ -55,7 +56,7 @@ Thumbs.db
 *.txt
 !requirements.txt
 !README.md
-
+.
 # Cache
 .cache/
 *.cache
