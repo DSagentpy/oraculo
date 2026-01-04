@@ -164,7 +164,7 @@ Este projeto é de uso educacional.
 
 ---
 
-Desenvolvido com ❤️ usando Streamlit e LangChain
+
 
 
 
