@@ -140,7 +140,7 @@ O Oráculo suporta os seguintes modelos:
 
 - As API Keys são inseridas como campos de senha (não são exibidas)
 - Arquivos temporários são criados durante o processamento e podem ser limpos após o uso
-- Não compartilhe suas API Keys publicamente
+
 
 ## 🐛 Solução de Problemas
 
